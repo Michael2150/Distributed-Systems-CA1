@@ -1,0 +1,99 @@
+[
+    {
+        "adult": false,
+        "backdrop_path": "/h56edmERPTkey89SqyKu4hINVNy.jpg",
+        "genre_ids": [
+            28,
+            53
+        ],
+        "id": 575264,
+        "original_language": "en",
+        "original_title": "Mission: Impossible - Dead Reckoning Part One",
+        "overview": "Ethan Hunt and his IMF team embark on their most dangerous mission yet: To track down a terrifying new weapon that threatens all of humanity before it falls into the wrong hands. With control of the future and the world's fate at stake and dark forces from Ethan's past closing in, a deadly race around the globe begins. Confronted by a mysterious, all-powerful enemy, Ethan must consider that nothing can matter more than his mission\u2014not even the lives of those he cares about most.",
+        "popularity": 2820.303,
+        "poster_path": "/NNxYkU70HPurnNCSiCjYAmacwm.jpg",
+        "release_date": "2023-07-08",
+        "title": "Mission: Impossible - Dead Reckoning Part One",
+        "video": false,
+        "vote_average": 7.7,
+        "vote_count": 2226
+    },
+    {
+        "adult": false,
+        "backdrop_path": "/t5zCBSB5xMDKcDqe91qahCOUYVV.jpg",
+        "genre_ids": [
+            27,
+            9648
+        ],
+        "id": 507089,
+        "original_language": "en",
+        "original_title": "Five Nights at Freddy's",
+        "overview": "Recently fired and desperate for work, a troubled young man named Mike agrees to take a position as a night security guard at an abandoned theme restaurant: Freddy Fazbear's Pizzeria. But he soon discovers that nothing at Freddy's is what it seems.",
+        "popularity": 2613.406,
+        "poster_path": "/j9mH1pr3IahtraTWxVEMANmPSGR.jpg",
+        "release_date": "2023-10-25",
+        "title": "Five Nights at Freddy's",
+        "video": false,
+        "vote_average": 8.1,
+        "vote_count": 1956
+    },
+    {
+        "adult": false,
+        "backdrop_path": "/pA3vdhadJPxF5GA1uo8OPTiNQDT.jpg",
+        "genre_ids": [
+            28,
+            18
+        ],
+        "id": 678512,
+        "original_language": "en",
+        "original_title": "Sound of Freedom",
+        "overview": "The story of Tim Ballard, a former US government agent, who quits his job in order to devote his life to rescuing children from global sex traffickers.",
+        "popularity": 1696.655,
+        "poster_path": "/qA5kPYZA7FkVvqcEfJRoOy4kpHg.jpg",
+        "release_date": "2023-07-03",
+        "title": "Sound of Freedom",
+        "video": false,
+        "vote_average": 8.2,
+        "vote_count": 1307
+    },
+    {
+        "adult": false,
+        "backdrop_path": "/rMvPXy8PUjj1o8o1pzgQbdNCsvj.jpg",
+        "genre_ids": [
+            28,
+            12,
+            53
+        ],
+        "id": 299054,
+        "original_language": "en",
+        "original_title": "Expend4bles",
+        "overview": "Armed with every weapon they can get their hands on and the skills to use them, The Expendables are the world\u2019s last line of defense and the team that gets called when all other options are off the table. But new team members with new styles and tactics are going to give \u201cnew blood\u201d a whole new meaning.",
+        "popularity": 1491.721,
+        "poster_path": "/iwsMu0ehRPbtaSxqiaUDQB9qMWT.jpg",
+        "release_date": "2023-09-15",
+        "title": "Expend4bles",
+        "video": false,
+        "vote_average": 6.5,
+        "vote_count": 645
+    },
+    {
+        "adult": false,
+        "backdrop_path": "/feSiISwgEpVzR1v3zv2n2AU4ANJ.jpg",
+        "genre_ids": [
+            28,
+            12,
+            878
+        ],
+        "id": 609681,
+        "original_language": "en",
+        "original_title": "The Marvels",
+        "overview": "Carol Danvers, aka Captain Marvel, has reclaimed her identity from the tyrannical Kree and taken revenge on the Supreme Intelligence. But unintended consequences see Carol shouldering the burden of a destabilized universe. When her duties send her to an anomalous wormhole linked to a Kree revolutionary, her powers become entangled with that of Jersey City super-fan Kamala Khan, aka Ms. Marvel, and Carol\u2019s estranged niece, now S.A.B.E.R. astronaut Captain Monica Rambeau. Together, this unlikely trio must team up and learn to work in concert to save the universe.",
+        "popularity": 1222.618,
+        "poster_path": "/tUtgLOESpCx7ue4BaeCTqp3vn1b.jpg",
+        "release_date": "2023-11-08",
+        "title": "The Marvels",
+        "video": false,
+        "vote_average": 6.4,
+        "vote_count": 213
+    }
+]
