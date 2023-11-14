@@ -91,20 +91,9 @@ export class DistributedSystemsCa1Stack extends cdk.Stack {
 
     this.auth = authApi.root.addResource("auth");
 
-    this.addAuthRoute(
-      "signup",
-      "POST",
-      "SignupFn",
-      'signup.ts'
-    );
+    
 
-    this.addAuthRoute(
-      "confirm_signup",
-      "POST",
-      "ConfirmFn",
-      "confirm-signup.ts"
-    );
-
+    // Lambda functions
     const appApi = new apig.RestApi(this, "MovieReviewApi", {
       description: "Movies REST API",
       endpointTypes: [apig.EndpointType.REGIONAL],
@@ -115,39 +104,5 @@ export class DistributedSystemsCa1Stack extends cdk.Stack {
 
     const protectedRes = appApi.root.addResource("protected");
     const publicRes = appApi.root.addResource("public");
-
-    // Public Endpoints
-    
-  }
-
-
-  private addAuthRoute(
-    resourceName: string,
-    method: string,
-    fnName: string,
-    fnEntry: string,
-    allowCognitoAccess?: boolean
-  ): void {
-    const commonFnProps = {
-      architecture: lambda.Architecture.ARM_64,
-      timeout: cdk.Duration.seconds(10),
-      memorySize: 128,
-      runtime: lambda.Runtime.NODEJS_16_X,
-      handler: "handler",
-      environment: {
-        USER_POOL_ID: this.userPoolId,
-        CLIENT_ID: this.userPoolClientId,
-        REGION: cdk.Aws.REGION
-      },
-    };
-    
-    const resource = this.auth.addResource(resourceName);
-    
-    const fn = new node.NodejsFunction(this, fnName, {
-      ...commonFnProps,
-      entry: `${__dirname}/../lambda/auth/${fnEntry}`,
-    });
-
-    resource.addMethod(method, new apig.LambdaIntegration(fn));
   }
 }
