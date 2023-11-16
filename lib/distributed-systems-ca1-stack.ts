@@ -7,6 +7,7 @@ import * as cognito from "aws-cdk-lib/aws-cognito";
 import * as node from "aws-cdk-lib/aws-lambda-nodejs";
 import { generateBatch } from "../shared/utils";
 import * as apig from "aws-cdk-lib/aws-apigateway";
+import { Lambda } from "aws-cdk-lib/aws-ses-actions";
 
 export class DistributedSystemsCa1Stack extends cdk.Stack {
   private auth: apig.IResource;
@@ -91,18 +92,56 @@ export class DistributedSystemsCa1Stack extends cdk.Stack {
 
     this.auth = authApi.root.addResource("auth");
 
-    
-
-    // Lambda functions
-    const appApi = new apig.RestApi(this, "MovieReviewApi", {
-      description: "Movies REST API",
-      endpointTypes: [apig.EndpointType.REGIONAL],
-      defaultCorsPreflightOptions: {
-        allowOrigins: apig.Cors.ALL_ORIGINS,
+    // sign up route
+    const signupFunction = new node.NodejsFunction(this, "SignupFunction", {
+      entry: "lambda/auth/signup.ts",
+      handler: "handler",
+      environment: {
+        USER_POOL_ID: this.userPoolId,
+        USER_POOL_CLIENT_ID: this.userPoolClientId,
       },
     });
 
-    const protectedRes = appApi.root.addResource("protected");
-    const publicRes = appApi.root.addResource("public");
+    // add signup route to API
+    const signupIntegration = new apig.LambdaIntegration(signupFunction);
+    this.auth.addMethod("POST", signupIntegration);
+
+    // confirm sign up route
+    const confirmSignupFunction = new node.NodejsFunction(
+      this,
+      "ConfirmSignupFunction",
+      {
+        entry: "lambda/auth/confirm-signup.ts",
+        handler: "handler",
+        environment: {
+          USER_POOL_ID: this.userPoolId,
+          USER_POOL_CLIENT_ID: this.userPoolClientId,
+        },
+      }
+    );
+
+    // add confirm sign up route to API
+    const confirmSignupIntegration = new apig.LambdaIntegration(
+      confirmSignupFunction
+    );
+    this.auth.addMethod("PUT", confirmSignupIntegration);
+
+    // authorizer route
+    const authorizerFunction = new node.NodejsFunction(
+      this,
+      "AuthorizerFunction",
+      {
+        entry: "lambda/auth/authorizer.ts",
+        handler: "handler",
+        environment: {
+          USER_POOL_ID: this.userPoolId,
+        },
+      }
+    );
+
+    // add authorizer route to API
+    const authorizerIntegration = new apig.LambdaIntegration(authorizerFunction);
+    this.auth.addMethod("GET", authorizerIntegration);
+
   }
 }
