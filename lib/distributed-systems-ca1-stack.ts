@@ -8,22 +8,17 @@ import { generateBatch } from '../shared/util';
 import * as custom from "aws-cdk-lib/custom-resources"
 import * as lambdanode from "aws-cdk-lib/aws-lambda-nodejs";
 
-export class DistributedCa1Stack extends cdk.Stack {
+export class DistributedSystemsCa1Stack extends cdk.Stack {
   constructor(scope: Construct, id: string, props?: cdk.StackProps) {
     super(scope, id, props);
 
     const reviewsTable = new dynamodb.Table(this, 'ReviewsTable', {
       billingMode: dynamodb.BillingMode.PAY_PER_REQUEST,
-      partitionKey: { name: 'movieId', type: dynamodb.AttributeType.NUMBER },
-      sortKey: { name: 'reviewDate', type: dynamodb.AttributeType.STRING },
+      partitionKey: { name: 'movie_id', type: dynamodb.AttributeType.NUMBER },
+      sortKey: { name: 'id', type: dynamodb.AttributeType.STRING },
       removalPolicy: cdk.RemovalPolicy.DESTROY,
       tableName: 'ReviewsTable',
     });
-
-    reviewsTable.addLocalSecondaryIndex({
-      indexName: "reviewerName",
-      sortKey: { name: "reviewerName", type: dynamodb.AttributeType.STRING },
-    })
 
     // Get all reviews lambda
     const getAllReviewsFn = new lambdanode.NodejsFunction(this, "GetAllReviewsFn", {

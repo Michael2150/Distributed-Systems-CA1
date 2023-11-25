@@ -1,5 +1,5 @@
 {
-  "app": "npx ts-node --prefer-ts-exts bin/distributed-ca-1.ts",
+  "app": "npx ts-node --prefer-ts-exts bin/distributed-systems-ca1.ts",
   "watch": {
     "include": [
       "**"
