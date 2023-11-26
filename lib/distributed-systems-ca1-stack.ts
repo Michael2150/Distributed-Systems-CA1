@@ -212,7 +212,6 @@ export class DistributedSystemsCa1Stack extends cdk.Stack {
     const movieIdReviewsEndpoint = movieIdEndpoint.addResource('reviews');
     const reviewerNameEndpoint = movieIdReviewsEndpoint.addResource('{reviewer_name}');
     const yearEndpoint = movieIdEndpoint.addResource('{year}');
-    // const reviewsByReviewerEndpoint = moviesEndpoint.addResource('{reviewer_name}');
     const translationEndpoint = movieIdReviewsEndpoint.addResource('translation');
 
     // POST /movies/reviews
@@ -246,11 +245,11 @@ export class DistributedSystemsCa1Stack extends cdk.Stack {
       authorizationType: apig.AuthorizationType.CUSTOM,
     });
 
-    // GET /movies/reviews/{reviewer_name}
-    // reviewsByReviewerEndpoint.addMethod('GET', new apig.LambdaIntegration(getReviewByReviewerLambda, { proxy: true }), {
-    //   authorizer: requestAuthorizer,
-    //   authorizationType: apig.AuthorizationType.CUSTOM,
-    // });
+    // GET /movies/reviews/{reviewer_name|movie_id}
+    movieIdEndpoint.addMethod('GET', new apig.LambdaIntegration(getReviewByReviewerLambda, { proxy: true }), {
+      authorizer: requestAuthorizer,
+      authorizationType: apig.AuthorizationType.CUSTOM,
+    });
 
     // GET /movies/{movie_id}/reviews/{reviewer_name}/translation?language=code
     translationEndpoint.addMethod('GET', new apig.LambdaIntegration(getTranslatedReviewLambda, { proxy: true }), {
