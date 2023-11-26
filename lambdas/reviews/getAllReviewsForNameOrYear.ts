@@ -35,7 +35,7 @@ export const handler: APIGatewayProxyHandlerV2 = async (event, context) => {
                 FilterExpression: "movie_id = :movie_id AND begins_with(created_at, :year)",
                 ExpressionAttributeValues: {
                     ":movie_id": Number(movieId),
-                    ":year": Number(lastPathParameter),
+                    ":year": lastPathParameter,
                 },
             };
         
