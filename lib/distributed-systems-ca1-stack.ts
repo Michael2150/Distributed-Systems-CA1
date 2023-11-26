@@ -10,10 +10,6 @@ import { UserPool } from "aws-cdk-lib/aws-cognito";
 import reviews from '../seed/reviews';
 
 export class DistributedSystemsCa1Stack extends cdk.Stack {
-  private auth: apig.IResource;
-  private userPoolId: string;
-  private userPoolClientId: string;
-
   constructor(scope: Construct, id: string, props?: cdk.StackProps) {
     super(scope, id, props);
  
@@ -26,6 +22,12 @@ export class DistributedSystemsCa1Stack extends cdk.Stack {
       sortKey: { name: 'id', type: dynamodb.AttributeType.STRING },
       removalPolicy: cdk.RemovalPolicy.DESTROY,
       tableName: 'ReviewsTable',
+    });
+
+    // Global Secondary Index for reviewer_name
+    reviewsTable.addGlobalSecondaryIndex({
+      indexName: 'reviewer_name-index',
+      partitionKey: { name: 'reviewer_name', type: dynamodb.AttributeType.STRING },
     });
 
     // Custom Resource to initialize DynamoDB data
@@ -56,15 +58,13 @@ export class DistributedSystemsCa1Stack extends cdk.Stack {
       removalPolicy: cdk.RemovalPolicy.DESTROY,
     });
 
-    this.userPoolId = userPool.userPoolId;
-
     const appClient = userPool.addClient("AppClient", {
       authFlows: { userPassword: true },
     });
 
-    this.userPoolClientId = appClient.userPoolClientId;
+    const userPoolId = userPool.userPoolId;
 
-
+    const userPoolClientId = appClient.userPoolClientId;
 
     // =================== Auth API ===================
 
@@ -76,9 +76,10 @@ export class DistributedSystemsCa1Stack extends cdk.Stack {
       runtime: lambda.Runtime.NODEJS_16_X,
       handler: "handler",
       environment: {
-        USER_POOL_ID: this.userPoolId,
-        CLIENT_ID: this.userPoolClientId,
-        REGION: cdk.Aws.REGION
+        USER_POOL_ID: userPoolId,
+        CLIENT_ID: userPoolClientId,
+        REGION: cdk.Aws.REGION,
+        TABLE_NAME: reviewsTable.tableName,
       },
     };
 
@@ -126,12 +127,12 @@ export class DistributedSystemsCa1Stack extends cdk.Stack {
       },
     });
 
-    this.auth = authApi.root.addResource("auth");
+    const auth = authApi.root.addResource("auth");
 
-    const signUpEndpoint = this.auth.addResource("sign_up");
-    const confirmSignUpEndpoint = this.auth.addResource("confirm_sign_up");
-    const signInEndpoint = this.auth.addResource("sign_in");
-    const signOutEndpoint = this.auth.addResource("sign_out");
+    const signUpEndpoint = auth.addResource("sign_up");
+    const confirmSignUpEndpoint = auth.addResource("confirm_sign_up");
+    const signInEndpoint = auth.addResource("sign_in");
+    const signOutEndpoint = auth.addResource("sign_out");
 
     // POST /auth/signUp
     signUpEndpoint.addMethod("POST", new apig.LambdaIntegration(signUpLambda));
@@ -147,6 +148,11 @@ export class DistributedSystemsCa1Stack extends cdk.Stack {
     // =================== Reviews API ===================
 
     // Reviews Lambda functions
+    const getAllReviews = new lambdanode.NodejsFunction(this, 'GetAllReviewsFn', {
+      ...commonLambdaConfig,
+      entry: `${__dirname}/../lambdas/reviews/getAllReviews.ts`,
+    });
+
     const addReviewLambda = new lambdanode.NodejsFunction(this, 'AddReviewFn', {
       ...commonLambdaConfig,
       entry: `${__dirname}/../lambdas/reviews/addReview.ts`,
@@ -157,24 +163,19 @@ export class DistributedSystemsCa1Stack extends cdk.Stack {
       entry: `${__dirname}/../lambdas/reviews/getAllReviewsForMovie.ts`,
     });
 
-    const getMovieReviewByReviewerLambda = new lambdanode.NodejsFunction(this, 'GetMovieReviewByReviewerFn', {
+    const getAllReviewsForNameOrYearLambda = new lambdanode.NodejsFunction(this, 'getAllReviewsForNameOrYearFn', {
       ...commonLambdaConfig,
-      entry: `${__dirname}/../lambdas/reviews/getMovieReviewByReviewer.ts`,
+      entry: `${__dirname}/../lambdas/reviews/getAllReviewsForNameOrYear.ts`,
     });
 
-    const getReviewByReviewerLambda = new lambdanode.NodejsFunction(this, 'GetReviewByReviewerFn', {
+    const getReviewsByRevierNameLambda = new lambdanode.NodejsFunction(this, 'getReviewsByReviewerNameFn', {
       ...commonLambdaConfig,
-      entry: `${__dirname}/../lambdas/reviews/getReviewByReviewer.ts`,
+      entry: `${__dirname}/../lambdas/reviews/getReviewsByReviewerName.ts`,
     });
 
     const updateReviewLambda = new lambdanode.NodejsFunction(this, 'UpdateReviewFn', {
       ...commonLambdaConfig,
       entry: `${__dirname}/../lambdas/reviews/updateReview.ts`,
-    });
-
-    const getReviewsByYearLambda = new lambdanode.NodejsFunction(this, 'GetReviewsByYearFn', {
-      ...commonLambdaConfig,
-      entry: `${__dirname}/../lambdas/reviews/getReviewsByYear.ts`,
     });
 
     const getTranslatedReviewLambda = new lambdanode.NodejsFunction(this, 'GetTranslatedReviewFn', {
@@ -183,12 +184,12 @@ export class DistributedSystemsCa1Stack extends cdk.Stack {
     });
 
     // Permissions
+    reviewsTable.grantReadData(getAllReviews);
     reviewsTable.grantWriteData(addReviewLambda);
     reviewsTable.grantReadData(getAllReviewsForMovieLambda);
-    reviewsTable.grantReadData(getMovieReviewByReviewerLambda);
-    reviewsTable.grantReadData(getReviewByReviewerLambda);
+    reviewsTable.grantReadData(getAllReviewsForNameOrYearLambda);
+    reviewsTable.grantReadData(getReviewsByRevierNameLambda);
     reviewsTable.grantWriteData(updateReviewLambda);
-    reviewsTable.grantReadData(getReviewsByYearLambda);
     reviewsTable.grantReadData(getTranslatedReviewLambda);
 
     // API Gateway
@@ -207,31 +208,34 @@ export class DistributedSystemsCa1Stack extends cdk.Stack {
 
     // API Gateway Endpoints
     const moviesEndpoint = api.root.addResource('movies');
-    const reviewsEndpoint = moviesEndpoint.addResource('reviews');
-    const movieIdEndpoint = moviesEndpoint.addResource('{movie_id}');
-    const movieIdReviewsEndpoint = movieIdEndpoint.addResource('reviews');
+    const moviesReviewsEndpoint = moviesEndpoint.addResource('reviews');
+    const moviesByReviewerNameEndpoint = moviesReviewsEndpoint.addResource('{reviewer_name}');
+    const moviesByMovieIdEndpoint = moviesEndpoint.addResource('{movie_id}');
+    const movieIdReviewsEndpoint = moviesByMovieIdEndpoint.addResource('reviews');
     const reviewerNameEndpoint = movieIdReviewsEndpoint.addResource('{reviewer_name}');
-    const yearEndpoint = movieIdEndpoint.addResource('{year}');
-    const translationEndpoint = movieIdReviewsEndpoint.addResource('translation');
+    const translationEndpoint = reviewerNameEndpoint.addResource('translation');
+
+
+
+    // GET /movies
+    moviesEndpoint.addMethod('GET', new apig.LambdaIntegration(getAllReviews, { proxy: true }));
 
     // POST /movies/reviews
-    reviewsEndpoint.addMethod('POST', new apig.LambdaIntegration(addReviewLambda, { proxy: true }), {
+    moviesReviewsEndpoint.addMethod('POST', new apig.LambdaIntegration(addReviewLambda, { proxy: true }), {
       authorizer: requestAuthorizer,
       authorizationType: apig.AuthorizationType.CUSTOM,
     });
+
+    // GET /movies/reviews/{reviewer_name}
+    moviesByReviewerNameEndpoint.addMethod('GET', new apig.LambdaIntegration(getReviewsByRevierNameLambda, { proxy: true }));
 
     // GET /movies/{movie_id}/reviews
     // GET /movies/{movie_id}/reviews?minRating=n
-    movieIdReviewsEndpoint.addMethod('GET', new apig.LambdaIntegration(getAllReviewsForMovieLambda, { proxy: true }), {
-      authorizer: requestAuthorizer,
-      authorizationType: apig.AuthorizationType.CUSTOM,
-    });
+    movieIdReviewsEndpoint.addMethod('GET', new apig.LambdaIntegration(getAllReviewsForMovieLambda, { proxy: true }));
 
     // GET /movies/{movie_id}/reviews/{reviewer_name}
-    reviewerNameEndpoint.addMethod('GET', new apig.LambdaIntegration(getMovieReviewByReviewerLambda, { proxy: true }), {
-      authorizer: requestAuthorizer,
-      authorizationType: apig.AuthorizationType.CUSTOM,
-    });
+    // GET /movies/{movie_id}/reviews/{year}
+    reviewerNameEndpoint.addMethod('GET', new apig.LambdaIntegration(getAllReviewsForNameOrYearLambda, { proxy: true }));
 
     // PUT /movies/{movie_id}/reviews/{reviewer_name}
     reviewerNameEndpoint.addMethod('PUT', new apig.LambdaIntegration(updateReviewLambda, { proxy: true }), {
@@ -239,22 +243,7 @@ export class DistributedSystemsCa1Stack extends cdk.Stack {
       authorizationType: apig.AuthorizationType.CUSTOM,
     });
 
-    // GET /movies/{movie_id}/reviews/{year}
-    yearEndpoint.addMethod('GET', new apig.LambdaIntegration(getReviewsByYearLambda, { proxy: true }), {
-      authorizer: requestAuthorizer,
-      authorizationType: apig.AuthorizationType.CUSTOM,
-    });
-
-    // GET /movies/reviews/{reviewer_name|movie_id}
-    movieIdEndpoint.addMethod('GET', new apig.LambdaIntegration(getReviewByReviewerLambda, { proxy: true }), {
-      authorizer: requestAuthorizer,
-      authorizationType: apig.AuthorizationType.CUSTOM,
-    });
-
     // GET /movies/{movie_id}/reviews/{reviewer_name}/translation?language=code
-    translationEndpoint.addMethod('GET', new apig.LambdaIntegration(getTranslatedReviewLambda, { proxy: true }), {
-      authorizer: requestAuthorizer,
-      authorizationType: apig.AuthorizationType.CUSTOM,
-    });
+    translationEndpoint.addMethod('GET', new apig.LambdaIntegration(getTranslatedReviewLambda, { proxy: true }));
   }
 }
