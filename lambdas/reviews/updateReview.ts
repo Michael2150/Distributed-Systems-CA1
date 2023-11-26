@@ -38,10 +38,10 @@ export const handler: APIGatewayProxyHandlerV2 = async (event, context) => {
                 "movie_id": Number(movie_id),
                 "author": reviewer_name,
             },
-            UpdateExpression: "set rating = :rating, review = :review",
+            UpdateExpression: "set rating = :rating, content = :review",
             ExpressionAttributeValues: {
                 ":rating": body.rating,
-                ":review": body.review,
+                ":review": body.content,
             },
         };
 

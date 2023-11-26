@@ -8,6 +8,8 @@ import { generateBatch } from '../shared/util';
 import { Construct } from 'constructs';
 import { UserPool } from "aws-cdk-lib/aws-cognito";
 import reviews from '../seed/reviews';
+import * as iam from 'aws-cdk-lib/aws-iam'; // Add this import statement
+import { ManagedPolicy } from '@aws-cdk/aws-iam';
 
 export class DistributedSystemsCa1Stack extends cdk.Stack {
   constructor(scope: Construct, id: string, props?: cdk.StackProps) {
@@ -183,6 +185,12 @@ export class DistributedSystemsCa1Stack extends cdk.Stack {
       entry: `${__dirname}/../lambdas/reviews/getTranslatedReview.ts`,
     });
 
+    getTranslatedReviewLambda.role?.addManagedPolicy(iam.ManagedPolicy.fromAwsManagedPolicyName('service-role/AWSLambdaBasicExecutionRole'));
+    getTranslatedReviewLambda.addToRolePolicy(new iam.PolicyStatement({
+      actions: ['translate:TranslateText'], 
+      resources: ['*'], 
+    }));
+
     // Permissions
     reviewsTable.grantReadData(getAllReviews);
     reviewsTable.grantWriteData(addReviewLambda);
@@ -191,6 +199,8 @@ export class DistributedSystemsCa1Stack extends cdk.Stack {
     reviewsTable.grantReadData(getReviewsByRevierNameLambda);
     reviewsTable.grantWriteData(updateReviewLambda);
     reviewsTable.grantReadData(getTranslatedReviewLambda);
+
+    
 
     // API Gateway
     const api = new apig.RestApi(this, 'ReviewsApi', {

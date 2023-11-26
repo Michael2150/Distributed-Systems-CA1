@@ -1,7 +1,9 @@
 import { APIGatewayProxyHandlerV2 } from "aws-lambda";
 import { createDDbDocClient } from "../../shared/util";
 import { ScanCommandInput, ScanCommand } from "@aws-sdk/lib-dynamodb";
+import { Translate } from 'aws-sdk';
 
+const translate = new Translate({ region: 'eu-west-1' });
 const ddbClient = createDDbDocClient();
 
 export const handler: APIGatewayProxyHandlerV2 = async (event, context) => {
@@ -35,6 +37,16 @@ export const handler: APIGatewayProxyHandlerV2 = async (event, context) => {
         };
 
         const results = (await ddbClient.send(new ScanCommand(params))).Items || [];
+
+        for (const review of results) {
+            const params : Translate.Types.TranslateTextRequest = {
+                SourceLanguageCode: 'en',
+                TargetLanguageCode: language,
+                Text: review.content,
+            };
+            const translatedReview = await translate.translateText(params).promise();
+            review.content = translatedReview.TranslatedText;
+        }
 
         return {
             statusCode: 200,
