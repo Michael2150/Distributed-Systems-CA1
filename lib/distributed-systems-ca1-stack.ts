@@ -4,14 +4,20 @@ import * as custom from 'aws-cdk-lib/custom-resources';
 import * as dynamodb from 'aws-cdk-lib/aws-dynamodb';
 import * as lambda from 'aws-cdk-lib/aws-lambda';
 import * as lambdanode from 'aws-cdk-lib/aws-lambda-nodejs';
-import * as cognito from 'aws-cdk-lib/aws-cognito';
 import { generateBatch } from '../shared/util';
 import { Construct } from 'constructs';
+import { UserPool } from "aws-cdk-lib/aws-cognito";
 import reviews from '../seed/reviews';
 
 export class DistributedSystemsCa1Stack extends cdk.Stack {
+  private auth: apig.IResource;
+  private userPoolId: string;
+  private userPoolClientId: string;
+
   constructor(scope: Construct, id: string, props?: cdk.StackProps) {
     super(scope, id, props);
+ 
+    // =================== Database ===================
 
     // DynamoDB Table for Reviews
     const reviewsTable = new dynamodb.Table(this, 'ReviewsTable', {
@@ -22,19 +28,125 @@ export class DistributedSystemsCa1Stack extends cdk.Stack {
       tableName: 'ReviewsTable',
     });
 
-    // Common Lambda configuration
-    const commonLambdaConfig: lambdanode.NodejsFunctionProps = {
+    // Custom Resource to initialize DynamoDB data
+    new custom.AwsCustomResource(this, 'InitReviewsDDBData', {
+      onCreate: {
+        service: 'DynamoDB',
+        action: 'batchWriteItem',
+        parameters: {
+          RequestItems: {
+            [reviewsTable.tableName]: generateBatch(reviews),
+          },
+        },
+        physicalResourceId: custom.PhysicalResourceId.of('initReviewsDDBData'),
+      },
+      policy: custom.AwsCustomResourcePolicy.fromSdkCalls({
+        resources: [reviewsTable.tableArn],
+      }),
+    });
+
+
+
+    // =================== Cognito Auth ===================
+
+    // Cognito User Pool
+    const userPool = new UserPool(this, "UserPool", {
+      signInAliases: { username: true, email: true },
+      selfSignUpEnabled: true,
+      removalPolicy: cdk.RemovalPolicy.DESTROY,
+    });
+
+    this.userPoolId = userPool.userPoolId;
+
+    const appClient = userPool.addClient("AppClient", {
+      authFlows: { userPassword: true },
+    });
+
+    this.userPoolClientId = appClient.userPoolClientId;
+
+
+
+    // =================== Auth API ===================
+
+    // Auth Lambda functions
+    const commonLambdaConfig = {
       architecture: lambda.Architecture.ARM_64,
-      runtime: lambda.Runtime.NODEJS_16_X,
       timeout: cdk.Duration.seconds(10),
       memorySize: 128,
+      runtime: lambda.Runtime.NODEJS_16_X,
+      handler: "handler",
       environment: {
-        TABLE_NAME: reviewsTable.tableName,
-        REGION: 'eu-west-1',
+        USER_POOL_ID: this.userPoolId,
+        CLIENT_ID: this.userPoolClientId,
+        REGION: cdk.Aws.REGION
       },
     };
 
-    // Lambda functions
+    const signUpLambda = new lambdanode.NodejsFunction(this, 'SignUpFn', {
+      ...commonLambdaConfig,
+      entry: `${__dirname}/../lambdas/auth/signup.ts`,
+    });
+
+    const confirmSignUpLambda = new lambdanode.NodejsFunction(this, 'ConfirmSignUpFn', {
+      ...commonLambdaConfig,
+      entry: `${__dirname}/../lambdas/auth/confirm-signup.ts`,
+    });
+
+    const signInLambda = new lambdanode.NodejsFunction(this, 'SignInFn', {
+      ...commonLambdaConfig,
+      entry: `${__dirname}/../lambdas/auth/signin.ts`,
+    });
+
+    const signOutLambda = new lambdanode.NodejsFunction(this, 'SignOutFn', {
+      ...commonLambdaConfig,
+      entry: `${__dirname}/../lambdas/auth/signout.ts`,
+    });
+
+    const authorizerFn = new lambdanode.NodejsFunction(this, 'AuthFn', {
+      ...commonLambdaConfig,
+      entry: `${__dirname}/../lambdas/auth/authorizer.ts`,
+    });
+
+    const requestAuthorizer = new apig.RequestAuthorizer(
+      this,
+      "RequestAuthorizer",
+      {
+        identitySources: [apig.IdentitySource.header("cookie")],
+        handler: authorizerFn,
+        resultsCacheTtl: cdk.Duration.minutes(0),
+      }
+    );
+
+    // Auth API Gateway
+    const authApi = new apig.RestApi(this, "AuthServiceApi", {
+      description: "Authentication Service RestApi",
+      endpointTypes: [apig.EndpointType.REGIONAL],
+      defaultCorsPreflightOptions: {
+        allowOrigins: apig.Cors.ALL_ORIGINS,
+      },
+    });
+
+    this.auth = authApi.root.addResource("auth");
+
+    const signUpEndpoint = this.auth.addResource("sign_up");
+    const confirmSignUpEndpoint = this.auth.addResource("confirm_sign_up");
+    const signInEndpoint = this.auth.addResource("sign_in");
+    const signOutEndpoint = this.auth.addResource("sign_out");
+
+    // POST /auth/signUp
+    signUpEndpoint.addMethod("POST", new apig.LambdaIntegration(signUpLambda));
+    // POST /auth/confirmSignUp
+    confirmSignUpEndpoint.addMethod("POST", new apig.LambdaIntegration(confirmSignUpLambda));
+    // POST /auth/signIn
+    signInEndpoint.addMethod("POST", new apig.LambdaIntegration(signInLambda));
+    // GET /auth/signOut
+    signOutEndpoint.addMethod("GET", new apig.LambdaIntegration(signOutLambda));
+
+
+    
+    // =================== Reviews API ===================
+
+    // Reviews Lambda functions
     const addReviewLambda = new lambdanode.NodejsFunction(this, 'AddReviewFn', {
       ...commonLambdaConfig,
       entry: `${__dirname}/../lambdas/reviews/addReview.ts`,
@@ -68,23 +180,6 @@ export class DistributedSystemsCa1Stack extends cdk.Stack {
     const getTranslatedReviewLambda = new lambdanode.NodejsFunction(this, 'GetTranslatedReviewFn', {
       ...commonLambdaConfig,
       entry: `${__dirname}/../lambdas/reviews/getTranslatedReview.ts`,
-    });
-
-    // Custom Resource to initialize DynamoDB data
-    new custom.AwsCustomResource(this, 'InitReviewsDDBData', {
-      onCreate: {
-        service: 'DynamoDB',
-        action: 'batchWriteItem',
-        parameters: {
-          RequestItems: {
-            [reviewsTable.tableName]: generateBatch(reviews),
-          },
-        },
-        physicalResourceId: custom.PhysicalResourceId.of('initReviewsDDBData'),
-      },
-      policy: custom.AwsCustomResourcePolicy.fromSdkCalls({
-        resources: [reviewsTable.tableArn],
-      }),
     });
 
     // Permissions
@@ -121,19 +216,46 @@ export class DistributedSystemsCa1Stack extends cdk.Stack {
     const translationEndpoint = movieIdReviewsEndpoint.addResource('translation');
 
     // POST /movies/reviews
-    reviewsEndpoint.addMethod('POST', new apig.LambdaIntegration(addReviewLambda, { proxy: true }));
+    reviewsEndpoint.addMethod('POST', new apig.LambdaIntegration(addReviewLambda, { proxy: true }), {
+      authorizer: requestAuthorizer,
+      authorizationType: apig.AuthorizationType.CUSTOM,
+    });
+
     // GET /movies/{movie_id}/reviews
     // GET /movies/{movie_id}/reviews?minRating=n
-    movieIdReviewsEndpoint.addMethod('GET', new apig.LambdaIntegration(getAllReviewsForMovieLambda, { proxy: true }));
+    movieIdReviewsEndpoint.addMethod('GET', new apig.LambdaIntegration(getAllReviewsForMovieLambda, { proxy: true }), {
+      authorizer: requestAuthorizer,
+      authorizationType: apig.AuthorizationType.CUSTOM,
+    });
+
     // GET /movies/{movie_id}/reviews/{reviewer_name}
-    reviewerNameEndpoint.addMethod('GET', new apig.LambdaIntegration(getMovieReviewByReviewerLambda, { proxy: true }));
+    reviewerNameEndpoint.addMethod('GET', new apig.LambdaIntegration(getMovieReviewByReviewerLambda, { proxy: true }), {
+      authorizer: requestAuthorizer,
+      authorizationType: apig.AuthorizationType.CUSTOM,
+    });
+
     // PUT /movies/{movie_id}/reviews/{reviewer_name}
-    reviewerNameEndpoint.addMethod('PUT', new apig.LambdaIntegration(updateReviewLambda, { proxy: true }));
+    reviewerNameEndpoint.addMethod('PUT', new apig.LambdaIntegration(updateReviewLambda, { proxy: true }), {
+      authorizer: requestAuthorizer,
+      authorizationType: apig.AuthorizationType.CUSTOM,
+    });
+
     // GET /movies/{movie_id}/reviews/{year}
-    yearEndpoint.addMethod('GET', new apig.LambdaIntegration(getReviewsByYearLambda, { proxy: true }));
+    yearEndpoint.addMethod('GET', new apig.LambdaIntegration(getReviewsByYearLambda, { proxy: true }), {
+      authorizer: requestAuthorizer,
+      authorizationType: apig.AuthorizationType.CUSTOM,
+    });
+
     // GET /movies/reviews/{reviewer_name}
-    // reviewsByReviewerEndpoint.addMethod('GET', new apig.LambdaIntegration(getReviewByReviewerLambda, { proxy: true }));
+    // reviewsByReviewerEndpoint.addMethod('GET', new apig.LambdaIntegration(getReviewByReviewerLambda, { proxy: true }), {
+    //   authorizer: requestAuthorizer,
+    //   authorizationType: apig.AuthorizationType.CUSTOM,
+    // });
+
     // GET /movies/{movie_id}/reviews/{reviewer_name}/translation?language=code
-    translationEndpoint.addMethod('GET', new apig.LambdaIntegration(getTranslatedReviewLambda, { proxy: true }));
+    translationEndpoint.addMethod('GET', new apig.LambdaIntegration(getTranslatedReviewLambda, { proxy: true }), {
+      authorizer: requestAuthorizer,
+      authorizationType: apig.AuthorizationType.CUSTOM,
+    });
   }
 }

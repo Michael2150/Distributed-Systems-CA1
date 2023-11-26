@@ -1,31 +1,87 @@
 {
     "$schema": "http://json-schema.org/draft-07/schema#",
     "definitions": {
-        "Review": {
+        "ConfirmSignUpBody": {
             "additionalProperties": false,
             "properties": {
-                "content": {
+                "code": {
                     "type": "string"
                 },
-                "movieId": {
-                    "type": "number"
-                },
-                "rating": {
-                    "type": "number"
-                },
-                "reviewDate": {
-                    "type": "string"
-                },
-                "reviewerName": {
+                "username": {
                     "type": "string"
                 }
             },
             "required": [
+                "code",
+                "username"
+            ],
+            "type": "object"
+        },
+        "Review": {
+            "additionalProperties": false,
+            "properties": {
+                "author": {
+                    "type": "string"
+                },
+                "content": {
+                    "type": "string"
+                },
+                "created_at": {
+                    "type": "string"
+                },
+                "id": {
+                    "type": "string"
+                },
+                "movie_id": {
+                    "type": "number"
+                },
+                "rating": {
+                    "type": "number"
+                }
+            },
+            "required": [
+                "author",
                 "content",
-                "movieId",
-                "rating",
-                "reviewDate",
-                "reviewerName"
+                "created_at",
+                "id",
+                "movie_id",
+                "rating"
+            ],
+            "type": "object"
+        },
+        "SignInBody": {
+            "additionalProperties": false,
+            "properties": {
+                "password": {
+                    "type": "string"
+                },
+                "username": {
+                    "type": "string"
+                }
+            },
+            "required": [
+                "password",
+                "username"
+            ],
+            "type": "object"
+        },
+        "SignUpBody": {
+            "additionalProperties": false,
+            "properties": {
+                "email": {
+                    "type": "string"
+                },
+                "password": {
+                    "type": "string"
+                },
+                "username": {
+                    "type": "string"
+                }
+            },
+            "required": [
+                "email",
+                "password",
+                "username"
             ],
             "type": "object"
         },
